@@ -5,7 +5,7 @@
 using namespace rs2;
 
 /**
- * @brief 
+ * @brief A class to capture rgbd image from realsense sensors.
  * 
  */
 class rgbd_image_capture{
@@ -37,7 +37,7 @@ class xyz_to_pointcloud : public rgbd_image_capture{
 
             open3d::camera::PinholeCameraIntrinsic::PinholeCameraIntrinsic(width, height, std::move(intrinsic_mtrx));
 
-            point_cloud = open3d::geometry::PointCloud::CreateFromDepthImage(std::move(im_rgbd), );
+            point_cloud = open3d::geometry::PointCloud::CreateFromDepthImage(std::move(im_rgbd), core::Tensor::Eye(4, core::Float32, core::Device("CPU:0")), core::Tensor::Eye(4, core::Float32, core::Device("CPU:0")), rs2_get_depth_scale(rs), 1.0f, 1,false);
 
             utility::LogInfo("{}", rs.GetMetadata().ToString());
         }
