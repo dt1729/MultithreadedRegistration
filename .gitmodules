@@ -1,0 +1,3 @@
+[submodule "floam-multithreaded"]
+	path = floam-multithreaded
+	url = https://github.com/dt1729/floam-multithreaded
