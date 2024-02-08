@@ -42,3 +42,12 @@ class xyz_to_pointcloud : public rgbd_image_capture{
             utility::LogInfo("{}", rs.GetMetadata().ToString());
         }
 }
+
+
+/***
+ * 1. Initialise all the threads.
+ * 2. Create a point cloud buffer, create an IMU buffer. 
+ * 3. Spawn two threads:
+ *      1. Reader from sensor.
+ *      2. SLAM iteration, this replaces the code.
+ * /
