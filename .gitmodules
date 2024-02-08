@@ -1,3 +1,6 @@
 [submodule "floam-multithreaded"]
 	path = floam-multithreaded
 	url = https://github.com/dt1729/floam-multithreaded
+[submodule "LeGO-LOAM-multithreaded"]
+	path = LeGO-LOAM-multithreaded
+	url = https://github.com/dt1729/LeGO-LOAM-multithreaded
