@@ -7,6 +7,23 @@
 
 using namespace rs2;
 
+struct imu_data{
+    float roll;
+    float pitch;
+    float yaw;
+    float imuAccX;
+    float imuAccY;
+    float imuAccZ;
+    float imuAngularVeloX;
+    float imuAngularVeloY;
+    float imuAngularVeloZ;
+};
+
+struct buffer_struct{
+    open3d::geometry::PointCloud point_cloud;
+    imu_data imu_data;
+};
+
 /**
  * @brief A class to capture rgbd image from realsense sensors.
  * 
@@ -35,23 +52,6 @@ class d455_frame_capture{
     private:
         std::string config_file, bag_file;
 }
-
-struct imu_data{
-    float roll;
-    float pitch;
-    float yaw;
-    float imuAccX;
-    float imuAccY;
-    float imuAccZ;
-    float imuAngularVeloX;
-    float imuAngularVeloY;
-    float imuAngularVeloZ;
-};
-
-struct buffer_struct{
-    open3d::geometry::PointCloud point_cloud;
-    imu_data imu_data;
-};
 
 class rotation_estimator
 {
@@ -199,30 +199,21 @@ class sensor_to_buffer : public d455_frame_capture{
 
 int main(int argc, char *argv[]){
     sensor_to_buffer s2b;
-
     std::queue<buffer_struct> producer_consumer_queue;
-
     std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b);
     
     //    std::thread slam_thread();  Make a thread out of this and run it in parallel, call other things in the main while loop.
     {
         ros::init(argc, argv, "lego_loam");
-
         FeatureAssociation FA;
-
         ros::Rate rate(200);
         while (ros::ok())
         {
             ros::spinOnce();
-
             FA.runFeatureAssociation(); // Add parameter 
-
             rate.sleep();
         }
     }
-
     sensor_reader_thread.join();
-
-
     return 0;
 }
