@@ -15,29 +15,43 @@ class d455_frame_capture{
     public:
         rs2::tio::RealSenseSensor rs;
         // Declare RealSense pipeline, encapsulating the actual device and sensors
-        pipeline pipe;
+        rs2::pipeline pipe;
 
         void d455_frame_capture(){
             // TODO: Add functions from JSON to load config file and bag_file name.
 
-
             // Create a configuration for configuring the pipeline with a non default profile
             config cfg;
-
-            // TODO: Add if condition to check how many sensors can be seen here, if none fail the initalisation and return 0;
-            this->rs.ListDevices();
-            this->rs.InitSensor(rs_cfg, 0, bag_file);
-            this->rs.StartCapture(true);  // true: start recording with capture
-
             // Add streams of gyro and accelerometer to configuration
             cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
             cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
 
+            // TODO: Add if condition to check how many sensors can be seen here, if none fail the initalisation and return 0;
+            this->rs.ListDevices();
+            this->rs.InitSensor(cfg, 0, bag_file);
+            this->rs.StartCapture(false);  // true: start recording with capture
         }
 
     private:
         std::string config_file, bag_file;
 }
+
+struct imu_data{
+    float roll;
+    float pitch;
+    float yaw;
+    float imuAccX;
+    float imuAccY;
+    float imuAccZ;
+    float imuAngularVeloX;
+    float imuAngularVeloY;
+    float imuAngularVeloZ;
+};
+
+struct buffer_struct{
+    open3d::geometry::PointCloud point_cloud;
+    imu_data imu_data;
+};
 
 class rotation_estimator
 {
@@ -132,44 +146,41 @@ public:
 class sensor_to_buffer : public d455_frame_capture{
     public:
         void data_to_buffer(){
-            im_rgbd = rs.CaptureFrame(true, true);
+            pipe.start();
+
+            auto im_rgbd = rs.CaptureFrame(true, true);
 
             open3d::camera::PinholeCameraIntrinsic::PinholeCameraIntrinsic(width, height, std::move(intrinsic_mtrx));
 
             buffer.point_cloud = open3d::geometry::PointCloud::CreateFromDepthImage(std::move(im_rgbd), core::Tensor::Eye(4, core::Float32, core::Device("CPU:0")), core::Tensor::Eye(4, core::Float32, core::Device("CPU:0")), rs2_get_depth_scale(rs), 1.0f, 1,false);
 
-            buffer.imu_data = create_imu_data();
+            buffer.imu_data = create_imu_data(std::move(im_rgbd));
 
-            buffer.time_stamp = ... ;
-
-            utility::LogInfo("{}", rs.GetMetadata().ToString());
+            buffer.time_stamp = im_rgbd.time_stamp() ;
         }
 
-        void create_imu_data(){
+        void create_imu_data(rs::frame&& frame){
             rotation_estimator algo;
-            auto profile = pipe.start(cfg, [&](rs2::frame frame)
+            // Cast the frame that arrived to motion frame
+            auto motion = frame->as<rs2::motion_frame>();
+            // If casting succeeded and the arrived frame is from gyro stream
+            if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F)
             {
-                // Cast the frame that arrived to motion frame
-                auto motion = frame.as<rs2::motion_frame>();
-                // If casting succeeded and the arrived frame is from gyro stream
-                if (motion && motion.get_profile().stream_type() == RS2_STREAM_GYRO && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F)
-                {
-                    // Get the timestamp of the current frame
-                    double ts = motion.get_timestamp();
-                    // Get gyro measures
-                    rs2_vector gyro_data = motion.get_motion_data();
-                    // Call function that computes the angle of motion based on the retrieved measures
-                    algo.process_gyro(gyro_data, ts);
-                }
-                // If casting succeeded and the arrived frame is from accelerometer stream
-                if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F)
-                {
-                    // Get accelerometer measures
-                    rs2_vector accel_data = motion.get_motion_data();
-                    // Call function that computes the angle of motion based on the retrieved measures
-                    algo.process_accel(accel_data);
-                }
-            });
+                // Get the timestamp of the current frame
+                double ts = motion.get_timestamp();
+                // Get gyro measures
+                rs2_vector gyro_data = motion.get_motion_data();
+                // Call function that computes the angle of motion based on the retrieved measures
+                algo.process_gyro(gyro_data, ts);
+            }
+            // If casting succeeded and the arrived frame is from accelerometer stream
+            if (motion && motion.get_profile().stream_type() == RS2_STREAM_ACCEL && motion.get_profile().format() == RS2_FORMAT_MOTION_XYZ32F)
+            {
+                // Get accelerometer measures
+                rs2_vector accel_data = motion.get_motion_data();
+                // Call function that computes the angle of motion based on the retrieved measures
+                algo.process_accel(accel_data);
+            }
             return algo.get_theta();
         }
 
@@ -184,10 +195,34 @@ class sensor_to_buffer : public d455_frame_capture{
  * 3. Spawn two threads:
  *      1. Reader from sensor.
  *      2. SLAM iteration, this replaces the code.
- *  
 */
 
 int main(int argc, char *argv[]){
     sensor_to_buffer s2b;
-    std::thread SensorReader(&s2b.create_point_cloud, );
+
+    std::queue<buffer_struct> producer_consumer_queue;
+
+    std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b);
+    
+    //    std::thread slam_thread();  Make a thread out of this and run it in parallel, call other things in the main while loop.
+    {
+        ros::init(argc, argv, "lego_loam");
+
+        FeatureAssociation FA;
+
+        ros::Rate rate(200);
+        while (ros::ok())
+        {
+            ros::spinOnce();
+
+            FA.runFeatureAssociation(); // Add parameter 
+
+            rate.sleep();
+        }
+    }
+
+    sensor_reader_thread.join();
+
+
+    return 0;
 }
