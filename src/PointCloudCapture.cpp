@@ -189,6 +189,29 @@ class sensor_to_buffer : public d455_frame_capture{
 }
 
 
+void slam_call(int argc, char *argv[]){
+    ros::init(argc, argv, "lego_loam");
+
+    FeatureAssociation FA;
+    ImageProjection IP;
+    mapOptimization MO;
+    TransformFusion TFusion;
+
+    std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
+
+    ros::Rate rate(200);
+
+    while (ros::ok())
+    {
+        ros::spinOnce();
+        FA.runFeatureAssociation(); // Add parameter 
+        MO.run();
+        rate.sleep();
+    }
+
+    loopthread.join();
+}
+
 /***
  * 1. Initialise all the threads.
  * 2. Create a point cloud and IMU buffer. 
@@ -202,18 +225,8 @@ int main(int argc, char *argv[]){
     std::queue<buffer_struct> producer_consumer_queue;
     std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b);
     
-    //    std::thread slam_thread();  Make a thread out of this and run it in parallel, call other things in the main while loop.
-    {
-        ros::init(argc, argv, "lego_loam");
-        FeatureAssociation FA;
-        ros::Rate rate(200);
-        while (ros::ok())
-        {
-            ros::spinOnce();
-            FA.runFeatureAssociation(); // Add parameter 
-            rate.sleep();
-        }
-    }
+    std::thread slam_thread(slam_call, argc, argv);
     sensor_reader_thread.join();
+    slam_thread.join();
     return 0;
 }
