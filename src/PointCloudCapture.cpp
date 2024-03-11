@@ -217,15 +217,16 @@ void slam_call(int argc, char *argv[]){
  * 2. Create a point cloud and IMU buffer. 
  * 3. Spawn two threads:
  *      1. Reader from sensor.
- *      2. SLAM iteration, this replaces the code.
+ *      2. SLAM iteration.
 */
 
 int main(int argc, char *argv[]){
     sensor_to_buffer s2b;
-    std::queue<buffer_struct> producer_consumer_queue;
-    std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b);
-    
+    std::queue<buffer_struct> producer_consumer_queue; // Should this be a part of the bigger structure? How should this be shared as a variable between two threads
+
+    std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b, producer_consumer_queue);
     std::thread slam_thread(slam_call, argc, argv);
+
     sensor_reader_thread.join();
     slam_thread.join();
     return 0;
