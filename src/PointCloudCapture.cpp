@@ -145,10 +145,11 @@ public:
  */
 class sensor_to_buffer : public d455_frame_capture{
     public:
-        void data_to_buffer(){
+        void data_to_buffer(std::queue<buffer_struct> qq){
             pipe.start();
 
             auto im_rgbd = rs.CaptureFrame(true, true);
+            buffer_struct buffer();
 
             open3d::camera::PinholeCameraIntrinsic::PinholeCameraIntrinsic(width, height, std::move(intrinsic_mtrx));
 
@@ -157,6 +158,8 @@ class sensor_to_buffer : public d455_frame_capture{
             buffer.imu_data = create_imu_data(std::move(im_rgbd));
 
             buffer.time_stamp = im_rgbd.time_stamp() ;
+            std::lock_guard<std::mutex> lck(m);
+                qq.push_back(buffer);
         }
 
         void create_imu_data(rs::frame&& frame){
@@ -189,9 +192,7 @@ class sensor_to_buffer : public d455_frame_capture{
 }
 
 
-void slam_call(int argc, char *argv[]){
-    ros::init(argc, argv, "lego_loam");
-
+void slam_call(std::queue<buffer_struct> qq, std::mutex m){
     FeatureAssociation FA;
     ImageProjection IP;
     mapOptimization MO;
@@ -204,6 +205,7 @@ void slam_call(int argc, char *argv[]){
     while (ros::ok())
     {
         ros::spinOnce();
+        FA.laserCloudCopier(qq, m);
         FA.runFeatureAssociation(); // Add parameter 
         MO.run();
         rate.sleep();
@@ -221,11 +223,13 @@ void slam_call(int argc, char *argv[]){
 */
 
 int main(int argc, char *argv[]){
+    ros::init(argc, argv, "lego_loam");
+    std::mutex tt;
     sensor_to_buffer s2b;
     std::queue<buffer_struct> producer_consumer_queue; // Should this be a part of the bigger structure? How should this be shared as a variable between two threads
 
-    std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b, producer_consumer_queue);
-    std::thread slam_thread(slam_call, argc, argv);
+    std::thread sensor_reader_thread(&s2b.data_to_buffer, &s2b, producer_consumer_queue, tt);
+    std::thread slam_thread(slam_call, producer_consumer_queue, tt);
 
     sensor_reader_thread.join();
     slam_thread.join();
