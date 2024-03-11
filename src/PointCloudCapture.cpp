@@ -3,6 +3,8 @@
 #include "example.hpp"          // Include short list of convenience functions for rendering
 #include <cstring>
 #include <open3d/Open3D.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include <Eigen/Eigen.h>
 
 using namespace rs2;
@@ -20,7 +22,7 @@ struct imu_data{
 };
 
 struct buffer_struct{
-    open3d::geometry::PointCloud point_cloud;
+    open3d::geometry::PointCloud point_cloud; // Can i use template here to abstract out type between open3d and pcl?
     imu_data imu_data;
 };
 
