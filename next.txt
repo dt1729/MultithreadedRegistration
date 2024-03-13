@@ -1,0 +1,3 @@
+Next steps:
+    - Add adapter in buffer_struct to convert between open3d pointcloud and pcl 
+    - Convert simple PCL operations into CUDA accelerated operations.

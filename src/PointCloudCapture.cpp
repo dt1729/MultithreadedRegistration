@@ -1,3 +1,14 @@
+/**
+ * @file PointCloudCapture.cpp
+ * @author DIVYA TIWARI (divya.tiwari@colorado.edu)
+ * @brief This file is the basic running script for a multithreaded slam solution
+ * @version 0.1
+ * @date 2024-03-12
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
+
 #include <librealsense2/rs.hpp> 
 #include <mutex>
 #include "example.hpp"          // Include short list of convenience functions for rendering
